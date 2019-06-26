@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/include/**",
+                "${workspaceFolder}/app/include/*",
+                "${workspaceFolder}/app/include/driver/*",
+                "F:/AIIDE/AiThinkerIDE_V0.5/cygwin/usr/include",
+                "F:/AIIDE/AiThinkerIDE_V0.5/cygwin/lib/gcc/i686-pc-cygwin/5.4.0/include"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "intelliSenseMode": "msvc-x64"
+        }
+    ],
+    "version": 4
+}
