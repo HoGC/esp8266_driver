@@ -182,6 +182,9 @@ smartconfig_done(sc_status status, void *pdata) {
 		connect_flag = 0;
 		os_timer_disarm(&OS_Timer_SM);	// 关闭定时器
 		finish_cd(sm_comfig_status);
+		if(w_connect != NULL){
+			os_timer_arm(&OS_Timer_Wifistate, 500, 1);  // 使能定时器
+		}
 		break;
 	}
 
@@ -193,8 +196,8 @@ smartconfig_done(sc_status status, void *pdata) {
  */
 void ICACHE_FLASH_ATTR wifi_check(void) {
 	uint8 getState;
-	LOCAL uint8 count = 0;
-	LOCAL uint8 ap_id = 0;
+	static uint8 count = 0;
+	static uint8 ap_id = 0;
 	struct ip_info ipConfig;
 	if (smartconfig_flag != 1) {
 		wifi_get_ip_info(STATION_IF, &ipConfig);
@@ -205,7 +208,7 @@ void ICACHE_FLASH_ATTR wifi_check(void) {
 				count = 0;
 				connect_flag = 1;
 				INFO("wifi connect!\r\n");
-				os_timer_arm(&OS_Timer_Wifistate, 10000, 1);
+				os_timer_arm(&OS_Timer_Wifistate, 5000, 1);
 				w_connect();
 			}
 		} else {
@@ -262,6 +265,11 @@ void ICACHE_FLASH_ATTR start_smartconfig(smartconfig_cd_t cd) {
 	wifi_set_opmode(STATION_MODE);
 	finish_cd = cd;
 	smartconfig_start(smartconfig_done);
+
+	if(w_disconnect != NULL){
+		os_timer_disarm(&OS_Timer_Wifistate);	// 关闭定时器
+		w_disconnect();
+	}
 
 	os_timer_disarm(&OS_Timer_SM);	// 关闭定时器
 	os_timer_setfn(&OS_Timer_SM, (os_timer_func_t *) sm_wait_time, NULL);// 设置定时器
