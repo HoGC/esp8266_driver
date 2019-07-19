@@ -1,6 +1,7 @@
 /*
-* 0.96 OLED  显示程序
-*/
+ * oled driver
+ * Author: HoGC 
+ */
 #include "driver/i2c_oled.h"
 #include "driver/i2c_master.h"
 #include "driver/i2c_oled_fonts.h"
@@ -11,59 +12,54 @@
 static bool oledstat = false;//oled状态初始标识为假
 
 //向某寄存器中写入命令（数据），置位寄存器实现特定功能
-bool ICACHE_FLASH_ATTR
-OLED_writeReg(uint8_t reg_addr,uint8_t val)
+bool ICACHE_FLASH_ATTR OLED_writeReg(uint8_t reg_addr,uint8_t val)
 {
-  //启动iic通信
-  i2c_master_start();
-  //写OLED作为从设备的地址
-  i2c_master_writeByte(OLED_ADDRESS);
-  //如未收到回应信号则停止iic通信，返回失败标识
-  if(!i2c_master_checkAck()) {
-	  i2c_master_stop();
-    return 0;
-  }
-  //写寄存器地址
-  i2c_master_writeByte(reg_addr);
-  //如未收到回应信号则停止iic通信，返回失败标识
-  if(!i2c_master_checkAck()) {
-	  i2c_master_stop();
-    return 0;
-  }
-  //写数据，更新各位的值
-  i2c_master_writeByte(val&0xff);
-  //如未收到回应信号则停止iic通信，返回失败标识
-  if(!i2c_master_checkAck()) {
-	  i2c_master_stop();
-    return 0;
-  }
-  //停止iic通信
-  i2c_master_stop();
+	//启动iic通信
+ 	i2c_master_start();
+  	//写OLED作为从设备的地址
+  	i2c_master_writeByte(OLED_ADDRESS);
+  	//如未收到回应信号则停止iic通信，返回失败标识
+  	if(!i2c_master_checkAck()) {
+		i2c_master_stop();
+    	return 0;
+  	}
+  	//写寄存器地址
+  	i2c_master_writeByte(reg_addr);
+  	//如未收到回应信号则停止iic通信，返回失败标识
+  	if(!i2c_master_checkAck()) {
+		i2c_master_stop();
+    	return 0;
+  	}
+  	//写数据，更新各位的值
+  	i2c_master_writeByte(val&0xff);
+  	//如未收到回应信号则停止iic通信，返回失败标识
+  	if(!i2c_master_checkAck()) {
+	  	i2c_master_stop();
+    	return 0;
+  	}
+  	//停止iic通信
+  	i2c_master_stop();
 
-  //更新oled状态为真，即初始化完毕，可用了
-  if (reg_addr==0x00)
-    oledstat=true;
-    
-  return 1;
+  	//更新oled状态为真，即初始化完毕，可用了
+  	if (reg_addr==0x00)
+    	oledstat=true;
+    return 1;
 }
 
 //向显示控制寄存器中写命令，各命令值及含义见“0.96OLED显示屏_驱动芯片手册”文档的28页
-void ICACHE_FLASH_ATTR
-OLED_writeCmd(unsigned char I2C_Command)
+void ICACHE_FLASH_ATTR OLED_writeCmd(unsigned char I2C_Command)
 {
-  OLED_writeReg(0x00,I2C_Command);
+	OLED_writeReg(0x00,I2C_Command);
 }
 
 //写待显示的数据，也就是点亮要显示的分辨率点
-void ICACHE_FLASH_ATTR
-OLED_writeDat(unsigned char I2C_Data)
+void ICACHE_FLASH_ATTR OLED_writeDat(unsigned char I2C_Data)
 {
 	OLED_writeReg(0x40,I2C_Data);
 }
 
 //Oled初始化相关操作，参考51例程和中景园文档中给出的步骤，具体为什么这样初始化不甚明了，也许是模块自身规定的
-bool ICACHE_FLASH_ATTR
-OLED_Init(void)
+bool ICACHE_FLASH_ATTR OLED_Init(void)
 {
 
 	i2c_master_gpio_init();
@@ -112,8 +108,7 @@ OLED_Init(void)
 }
 
 //设置屏幕上的显示位置
-void ICACHE_FLASH_ATTR
-OLED_SetPos(unsigned char x, unsigned char y)
+void ICACHE_FLASH_ATTR OLED_SetPos(unsigned char x, unsigned char y)
 { 
 	OLED_writeCmd(0xb0+y);
 	OLED_writeCmd(((x&0xf0)>>4)|0x10);
@@ -121,8 +116,7 @@ OLED_SetPos(unsigned char x, unsigned char y)
 }
 
 //屏幕填充
-void ICACHE_FLASH_ATTR
-OLED_Fill(unsigned char fill_Data)
+void ICACHE_FLASH_ATTR OLED_Fill(unsigned char fill_Data)
 {
 	unsigned char m,n;
 	for(m=0;m<8;m++)
@@ -130,39 +124,36 @@ OLED_Fill(unsigned char fill_Data)
 		OLED_writeCmd(0xb0+m);		//第几页,也就是第几行
 		OLED_writeCmd(0x00);		//列低位的起始地址
 		OLED_writeCmd(0x10);		//列高位的起始地址
-		for(n=0;n<132;n++)
-			{
-				OLED_writeDat(fill_Data);
-			}
+		for(n=0;n<128;n++)
+		{
+			OLED_writeDat(fill_Data);
+		}
 	}
 }
 //清第N到M行
-void ICACHE_FLASH_ATTR
-OLED_CLS_N(unsigned char N,unsigned char M)
+void ICACHE_FLASH_ATTR OLED_CLS_N(unsigned char N,unsigned char M)
 {
 	unsigned char n;
-	for(;N<M;N++)
+	for(;N<=M;N++)
 	{
 		OLED_writeCmd(0xb0+N);		//第几页,也就是第几行
 		OLED_writeCmd(0x00);		//列低位的起始地址
 		OLED_writeCmd(0x10);		//列高位的起始地址
-		for(n=0;n<132;n++)
-			{
-				OLED_writeDat(0x00);
-			}
+		for(n=0;n<128;n++)
+		{
+			OLED_writeDat(0x00);
+		}
 	}
 }
 
 //清屏
-void ICACHE_FLASH_ATTR
-OLED_CLS(void)
+void ICACHE_FLASH_ATTR OLED_CLS(void)
 {
 	OLED_Fill(0x00);
 }
 
 //打开LED屏幕
-void ICACHE_FLASH_ATTR
-OLED_ON(void)
+void ICACHE_FLASH_ATTR OLED_ON(void)
 {
 	OLED_writeCmd(0X8D);
 	OLED_writeCmd(0X14);
@@ -170,8 +161,7 @@ OLED_ON(void)
 }
 
 //关闭LED屏幕
-void ICACHE_FLASH_ATTR
-OLED_OFF(void)
+void ICACHE_FLASH_ATTR OLED_OFF(void)
 {
 	OLED_writeCmd(0X8D);
 	OLED_writeCmd(0X10);
@@ -180,8 +170,7 @@ OLED_OFF(void)
 
 
 //在屏幕上的指定位置显示出指定的字符串，参数为列位置、行位置，待显示字符串，字体大小，也就是点亮相关分辨率点的过程
-void ICACHE_FLASH_ATTR
-OLED_ShowStr(unsigned char x, unsigned char y, unsigned char ch[], unsigned char TextSize)
+void ICACHE_FLASH_ATTR OLED_ShowStr(unsigned char x, unsigned char y, unsigned char ch[], unsigned char TextSize)
 {
 	unsigned char c = 0,i = 0,j = 0;
 	switch(TextSize)
@@ -250,8 +239,7 @@ void ICACHE_FLASH_ATTR OLED_P16x16Ch(unsigned char x,unsigned char y,unsigned ch
 
 //显示位图，由取模工具得位图数据，x0为起始列的点，y0为起始行的的点，x1/y1分别为终止行的点，BMP为位图数据，也就是点亮相关分辨率点的过程
 //可以将汉字设计为大小合适的位图，在合适的位置显示
-void ICACHE_FLASH_ATTR
-OLED_DrawBMP(unsigned char x0,unsigned char y0,unsigned char x1,unsigned char y1,unsigned char i)//
+void ICACHE_FLASH_ATTR OLED_DrawBMP(unsigned char x0,unsigned char y0,unsigned char x1,unsigned char y1,unsigned char i)//
 {
 	unsigned int j=0;
 	unsigned char x,y;
