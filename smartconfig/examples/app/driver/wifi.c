@@ -268,9 +268,9 @@ void ICACHE_FLASH_ATTR start_smartconfig(smartconfig_cd_t cd) {
 	wifi_set_opmode(STATION_MODE);
 	finish_cd = cd;
 	smartconfig_start(smartconfig_done);
+	os_timer_disarm(&OS_Timer_Wifistate);	// 关闭定时器
 
-	if(w_disconnect != NULL){
-		os_timer_disarm(&OS_Timer_Wifistate);	// 关闭定时器
+	if(connect_flag == 1){
 		INFO("wifi disconnect!\r\n");
 		w_disconnect();
 		connect_flag = 0;
