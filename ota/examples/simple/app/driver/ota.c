@@ -39,6 +39,15 @@ void ICACHE_FLASH_ATTR ota_start_upgrade(const char *server_ip, uint16_t port,
 
 	enum flash_size_map size_map = system_get_flash_size_map();
 	switch (size_map) {
+		case FLASH_SIZE_8M_MAP_512_512:
+			spi_size_map=2;
+            break;
+		case FLASH_SIZE_16M_MAP_512_512:
+			spi_size_map=3;
+            break;
+        case FLASH_SIZE_16M_MAP_1024_1024:
+			spi_size_map=5;
+            break;
         case FLASH_SIZE_32M_MAP_512_512:
 			spi_size_map=4;
             break;
@@ -46,7 +55,7 @@ void ICACHE_FLASH_ATTR ota_start_upgrade(const char *server_ip, uint16_t port,
 			spi_size_map=6;
             break;
         default:
-			INFO("NOT 32M_MAP! \n\n");
+			INFO("NOT MAP! \n\n");
             return;
     }
 	uint8_t userBin = system_upgrade_userbin_check();
@@ -61,8 +70,16 @@ void ICACHE_FLASH_ATTR ota_start_upgrade(const char *server_ip, uint16_t port,
 			INFO("Fail read system_upgrade_userbin_check! \n\n");
 			return;
 	}
-
-	os_sprintf(file,"user%d.4096.new.%d.bin",bin,spi_size_map);
+	if(spi_size_map == 4 || spi_size_map==6){
+		os_sprintf(file,"user%d.4096.new.%d.bin",bin,spi_size_map);
+	}
+	else if(spi_size_map == 3 || spi_size_map==5){
+		os_sprintf(file,"user%d.2048.new.%d.bin",bin,spi_size_map);
+	}else if(spi_size_map == 2){
+		os_sprintf(file,"user%d.1024.new.%d.bin",bin,spi_size_map);
+	}else{
+		return;
+	}
 	INFO("file name: %s\n\n",file);
 	
 	struct upgrade_server_info* update =
@@ -204,13 +221,13 @@ uint8 ICACHE_FLASH_ATTR userbin_check(void) {
 	userbin = system_upgrade_userbin_check();
 	if (userbin == UPGRADE_FW_BIN1) {
 		ret = 1;
-		INFO("upgrade_userbin：user1 \n");
+		INFO("\nupgrade_userbin:user1 \n");
 	} else if (userbin == UPGRADE_FW_BIN2) {
 		ret = 2;
-		INFO("upgrade_userbin：nuser2 \n");
+		INFO("\nupgrade_userbin:nuser2 \n");
 	} else {
 		ret = 0;
-		INFO("not_upgrade_userbin \n");
+		INFO("\nnot_upgrade_userbin \n");
 	}
 	return ret;
 }
@@ -224,6 +241,29 @@ uint8 ICACHE_FLASH_ATTR updata_status_check(void) {
 	uint8 updata_ret;
 	uint32 updata_status;
 	SpiFlashOpResult flash_ret = 0;
+	uint8 upgrade_status_flash = 0;
+	enum flash_size_map size_map = system_get_flash_size_map();
+	switch (size_map) {
+		case FLASH_SIZE_8M_MAP_512_512:
+			upgrade_status_flash = 124;
+            break;
+		case FLASH_SIZE_16M_MAP_512_512:
+			upgrade_status_flash = 124;
+            break;
+        case FLASH_SIZE_16M_MAP_1024_1024:
+			upgrade_status_flash = 252;
+            break;
+        case FLASH_SIZE_32M_MAP_512_512:
+			upgrade_status_flash = 124;
+            break;
+        case FLASH_SIZE_32M_MAP_1024_1024:
+			upgrade_status_flash = 252;
+            break;
+        default:
+			upgrade_status_flash = 124;
+            return;
+    }
+
 	flash_ret = spi_flash_read(upgrade_status_flash * SPI_FLASH_SEC_SIZE, (uint32 *) &updata_status, 4);
 	os_delay_us(1000);
 	if (flash_ret == SPI_FLASH_RESULT_OK) {
@@ -231,11 +271,11 @@ uint8 ICACHE_FLASH_ATTR updata_status_check(void) {
 		userbin = system_upgrade_userbin_check();
 		if (userbin != updata_status) {
 			updata_status = (uint32)userbin;
-			INFO("read_finish\r\n");
+			INFO("upgrade_userbin_read_finish\r\n");
 			spi_flash_erase_sector(upgrade_status_flash);
 			flash_ret =spi_flash_write(upgrade_status_flash * SPI_FLASH_SEC_SIZE, (uint32 *)&updata_status, 4);
 			if(flash_ret == SPI_FLASH_RESULT_OK){
-				INFO("write_finish\r\n");
+				INFO("upgrade_userbin_write_finish\r\n");
 			}
 			updata_ret = 1;
 		}else{

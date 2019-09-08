@@ -6,8 +6,6 @@
 #define _OTA_H_
 #include "upgrade.h"
 
-#define upgrade_status_flash	550
-
 uint8 ICACHE_FLASH_ATTR userbin_check(void);
 
 uint8 ICACHE_FLASH_ATTR updata_status_check(void);
