@@ -33,7 +33,7 @@ uint8 udp_sent_cnt = 0;
 uint8 smartconfig_flag = 0;
 bool connect_flag = 0;
 os_timer_t OS_Timer_SM;
-os_timer_t OS_Timer_Wifistate;
+os_timer_t OS_Timer_Wifichange;
 
 const airkiss_config_t akconf = { (airkiss_memset_fn) &memset,
 		(airkiss_memcpy_fn) &memcpy, (airkiss_memcmp_fn) &memcmp, 0, };
@@ -158,7 +158,6 @@ smartconfig_done(sc_status status, void *pdata) {
 		INFO("SC_STATUS_LINK\n");
 		sm_comfig_status = SM_STATUS_GETINFO;
 		struct station_config *sta_conf = pdata;
-
 		wifi_station_set_config(sta_conf);
 		wifi_station_disconnect();
 		wifi_station_connect();
@@ -169,7 +168,6 @@ smartconfig_done(sc_status status, void *pdata) {
 		if (pdata != NULL) {
 			//SC_TYPE_ESPTOUCH
 			uint8 phone_ip[4] = { 0 };
-
 			os_memcpy(phone_ip, (uint8*) pdata, 4);
 			INFO("Phone ip: %d.%d.%d.%d\n", phone_ip[0], phone_ip[1],
 					phone_ip[2], phone_ip[3]);
@@ -182,62 +180,57 @@ smartconfig_done(sc_status status, void *pdata) {
 		connect_flag = 0;
 		os_timer_disarm(&OS_Timer_SM);	// 关闭定时器
 		finish_cd(sm_comfig_status);
-		os_timer_arm(&OS_Timer_Wifistate, 500, 1);  // 使能定时器
+		os_timer_arm(&OS_Timer_Wifichange, 3000, 1);  // 使能定时器
 		break;
 	}
 
+}
+
+void wifi_handle_event_cb(System_Event_t *evt)
+{
+    switch	(evt->event)	{
+    case EVENT_STAMODE_CONNECTED:
+        INFO("connect to ssid %s\n",evt->event_info.connected.ssid);
+		connect_flag = 1;
+		if(w_connect != NULL){
+			w_connect();
+		}
+		os_timer_disarm(&OS_Timer_Wifichange);	// 关闭定时器
+        break;
+    case EVENT_STAMODE_DISCONNECTED:
+        INFO("disconnect from	ssid %s\n",evt->event_info.disconnected.ssid);
+		if(connect_flag == 1){
+			connect_flag = 0;
+			if(w_disconnect != NULL){
+				w_disconnect();
+			}
+			os_timer_arm(&OS_Timer_Wifichange, 3000, 1);  // 使能定时器
+		}
+        break;
+    default:
+        break;
+    }
 }
 
 /**
  * WIFI连接状态检查   
  * @retval None
  */
-void ICACHE_FLASH_ATTR wifi_check(void) {
-	uint8 getState;
-	static uint8 count = 0;
-	static uint8 ap_id = 0;
-	struct ip_info ipConfig;
-	if (smartconfig_flag != 1) {
-		wifi_get_ip_info(STATION_IF, &ipConfig);
-		getState = wifi_station_get_connect_status();
-		//查询 ESP8266 WiFi station 接口连接 AP 的状态
-		if (getState == STATION_GOT_IP && ipConfig.ip.addr != 0) {
-			if (connect_flag == 0) {
-				count = 0;
-				connect_flag = 1;
-				INFO("wifi connect!\r\n");
-				os_timer_arm(&OS_Timer_Wifistate, 5000, 1);
-				if(w_connect != NULL){
-					w_connect();
-				}
-			}
-		} else {
-			count++;
-			if (count > 10) {
-				count = 0;
-				ap_id = wifi_station_get_current_ap_id();
-				ap_id = ++ap_id % 2;
-				INFO("AP_ID : %d", ap_id);
-				wifi_station_ap_change(ap_id);
-			}
-			if(connect_flag == 1){
-				connect_flag = 0;
-				INFO("wifi disconnect!\r\n");
-				os_timer_arm(&OS_Timer_Wifistate, 1000, 1);
-				if(w_disconnect != NULL){
-					w_disconnect();
-				}
-			}
-
-		}
-	}
+void ICACHE_FLASH_ATTR wifi_ap_change(void) {
+	int ap_id;
+	ap_id = wifi_station_get_current_ap_id();
+	ap_id = ++ap_id % AP_INFO_MAX;
+	INFO("AP_ID : %d", ap_id);
+	wifi_station_disconnect();
+	wifi_station_ap_change(ap_id);
 }
+
 
 /**
  * 限制SmartConfig配置时间  
  * @retval 
  */
-void ICACHE_FLASH_ATTR sm_wait_time(void) {
+void ICACHE_FLASH_ATTR sm_wait_time() {
 
 	LOCAL wait_wait = 0;
 	if (wait_wait == 60) {
@@ -251,7 +244,7 @@ void ICACHE_FLASH_ATTR sm_wait_time(void) {
 		connect_flag = 0;
 		os_timer_disarm(&OS_Timer_SM);	// 关闭定时器
 		finish_cd(sm_comfig_status);
-		os_timer_arm(&OS_Timer_Wifistate, 500, 1);  // 使能定时器
+		os_timer_arm(&OS_Timer_Wifichange, 3000, 1);  // 使能定时器
 	}
 	wait_wait++;
 }
@@ -268,10 +261,9 @@ void ICACHE_FLASH_ATTR start_smartconfig(smartconfig_cd_t cd) {
 	wifi_set_opmode(STATION_MODE);
 	finish_cd = cd;
 	smartconfig_start(smartconfig_done);
-	os_timer_disarm(&OS_Timer_Wifistate);	// 关闭定时器
+	os_timer_disarm(&OS_Timer_Wifichange);	// 关闭定时器
 
 	if(connect_flag == 1){
-		INFO("wifi disconnect!\r\n");
 		w_disconnect();
 		connect_flag = 0;
 	}
@@ -315,18 +307,24 @@ void ICACHE_FLASH_ATTR set_wifistate_cb(wifconnect_cb_t u_connect_cb, wifdisconn
 	w_connect = u_connect_cb;
 	w_disconnect = u_disconnect_cb;
 
-	struct station_config config[5];
 	int i;
-	int	count = wifi_station_get_ap_info(config);
-	INFO("ap_num = %d\n", count);
-	for(i = 0; i < count; i++)
+	struct station_config config[5];
+
+	//设置wifi信息存储数量
+	wifi_station_ap_number_set(AP_INFO_MAX);
+
+	int ap_info_count = wifi_station_get_ap_info(config);
+	INFO("ap_info_count = %d\n", ap_info_count);
+	for(i = 0; i < ap_info_count; i++)
 	{
-		INFO("AP%d\n", i+1);
+		INFO("AP%d\n", i);
 		INFO("ssid : %s\n", config[i].ssid);
 		INFO("password : %s\n", config[i].password);
 	}
 
-	os_timer_disarm(&OS_Timer_Wifistate);	// 关闭定时器
-	os_timer_setfn(&OS_Timer_Wifistate, (os_timer_func_t *) wifi_check, NULL);// 设置定时器
-	os_timer_arm(&OS_Timer_Wifistate, 500, 1);  // 使能定时器
+	wifi_set_event_handler_cb(wifi_handle_event_cb);
+
+	os_timer_disarm(&OS_Timer_Wifichange);	// 关闭定时器
+	os_timer_setfn(&OS_Timer_Wifichange, (os_timer_func_t *) wifi_ap_change,NULL);// 设置定时器
+	os_timer_arm(&OS_Timer_Wifichange, 3000, 1);  // 使能定时器
 }
