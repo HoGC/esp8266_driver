@@ -20,8 +20,6 @@
 
 config_cd_t config_cd = NULL;
 
-u8 location[20];
-
 void data_send(void *arg, bool responseOK, char *psend) {
 	uint16 length = 0;
 	char *pbuf = NULL;

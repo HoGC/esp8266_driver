@@ -20,7 +20,62 @@
 
 config_cd_t config_cd = NULL;
 
-u8 location[20];
+/**
+ * Funtion 字符串转数字
+ * @param 2位十六进制字符串
+ * @return 十六进制整型
+ */
+int hex2dec(char c)
+{
+    if ('0' <= c && c <= '9')
+    {
+        return c - '0';
+    }
+    else if ('a' <= c && c <= 'f')
+    {
+        return c - 'a' + 10;
+    }
+    else if ('A' <= c && c <= 'F')
+    {
+        return c - 'A' + 10;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+
+/**
+ * Function 解码url
+ * @param url
+ * @return NONE
+ */
+void urldecode(char url[])
+{
+    int i = 0;
+    int len = strlen(url);
+    int res_len = 0;
+    char res[BURSIZE];
+    for (i = 0; i < len; ++i)
+    {
+        char c = url[i];
+        if (c != '%')
+        {
+            res[res_len++] = c;
+        }
+        else
+        {
+            char c1 = url[++i];
+            char c0 = url[++i];
+            int num = 0;
+            num = hex2dec(c1) * 16 + hex2dec(c0);
+            res[res_len++] = num;
+        }
+    }
+    res[res_len] = '\0';
+    strcpy(url, res);
+}
 
 void data_send(void *arg, bool responseOK, char *psend) {
 	uint16 length = 0;
@@ -242,6 +297,7 @@ void ICACHE_FLASH_ATTR webconfig_wifi_connect(char *psend) {
 	char *PB;
 	char *PA1;
 	char *PB1;
+	char buf[20];
 
 	struct station_config stationConf;
 
@@ -251,14 +307,20 @@ void ICACHE_FLASH_ATTR webconfig_wifi_connect(char *psend) {
 
 	if (os_strlen(PA) - os_strlen(PB) != 0) {
 
-		os_strncpy(stationConf.ssid, PA, os_strlen(PA) - os_strlen(PB));
-		stationConf.ssid[(os_strlen(PA) - os_strlen(PB))] = '\0';
+		os_strncpy(buf, PA, os_strlen(PA) - os_strlen(PB));
+		buf[(os_strlen(PA) - os_strlen(PB))] = '\0';
+		urldecode(buf);
+		os_strncpy(stationConf.ssid, buf, os_strlen(buf));
+		stationConf.ssid[os_strlen(buf)] = '\0';
 		PA1 = os_strstr(psend, "password");
 		PA1 = PA1 + os_strlen("password") + 1;
 		PB1 = os_strstr(PA1, "&submitOK");
         if(os_strlen(PA) - os_strlen(PB) != 0){
-            os_strncpy(stationConf.password, PA1, os_strlen(PA1) - os_strlen(PB1));
-		    stationConf.password[(os_strlen(PA1) - os_strlen(PB1))] = '\0';
+            os_strncpy(buf, PA1, os_strlen(PA1) - os_strlen(PB1));
+		    buf[(os_strlen(PA1) - os_strlen(PB1))] = '\0';
+			urldecode(buf);
+			os_strncpy(stationConf.password, buf, os_strlen(buf));
+			stationConf.password[os_strlen(buf)] = '\0';
         }
 		INFO("ssid:%s\n",stationConf.ssid);
         INFO("password:%s\n",stationConf.password);

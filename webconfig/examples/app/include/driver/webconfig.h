@@ -15,6 +15,7 @@ extern u8 location[20];
 #define HTML_FILE_SIZE 2052
 
 #define URLSize 10
+#define BURSIZE 2048
 
 typedef enum Result_Resp {
     RespFail = 0,
