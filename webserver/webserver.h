@@ -2,11 +2,12 @@
  * webconfig driver
  * Author: HoGC 
  */
-#ifndef __WEBCONFIG_H__
-#define __WEBCONFIG_H__
+#ifndef __WEBSERVER_H__
+#define __WEBSERVER_H__
 
-typedef void (*config_cd_t)(char *pusrdata, unsigned short length);
-extern u8 location[20];
+typedef void (*webserver_cd_t)(char *pusrdata, unsigned short length);
+
+#define BURSIZE 2048
 
 #define SERVER_PORT 80
 #define SERVER_SSL_PORT 443
@@ -50,7 +51,7 @@ typedef struct _rst_parm {
     struct espconn *pespconn;
 } rst_parm;
 
-void webconfig_init(char *ssidname, config_cd_t u_config_cd);
+void webserver_init(webserver_cd_t u_webserver_cd);
 void webserver_recon(void *arg, sint8 err);
 void webserver_listen(void *arg);
 void webserver_sent(void *arg);
@@ -58,8 +59,8 @@ void webserver_discon(void *arg);
 void webserver_recv(void *arg, char *pusrdata, unsigned short length);
 void data_send(void *arg, bool responseOK, char *psend);
 void parse_url(char *precv, URL_Frame *purl_frame);
-void webconfig_wifi_connect(char *psend);
-void webconfig_ota_url(char *psend);
+void webserver_wifi_connect(char *psend);
+void webserver_ota_url(char *psend);
 
 
 #define HTML_INDEX  "<!DOCTYPE html>\n"\
@@ -81,12 +82,13 @@ void webconfig_ota_url(char *psend);
                     "</head>\n"\
                     "<body>\n"\
                     "\t<div class=\"box\">\n"\
-                    "\t\t<h1 class=\"text-center\">网页配置</h1>\n"\
+                    "\t\t<h1 class=\"text-center\">WebServer</h1>\n"\
                     "\t\t<br>\n"\
                     "\t\t<a href=\"wifi\" class=\"btn btn-success\" style=\"width: 300px;\">WIFI配置</a>\n"\
                     "\t\t</br>\n"\
                     "\t\t</br>\n"\
                     "\t\t<a href=\"ota\" class=\"btn btn-primary\" style=\"width: 300px;\">OTA升级</a>\n"\
+                    "\t\t<p align=center><font size=\"1\" color=\"#333333\">HuangoGC</font></p>\n"\
                     "\t</div>\n"\
                     "</body>\n"\
                     "</html>"
@@ -118,41 +120,70 @@ void webconfig_ota_url(char *psend);
                     "\t\t\t</div>\n"\
                     "\t\t\t<button type=\"submit\" name=\"submitOK\" class=\"btn btn-primary\" style=\"width: 300px;\">开始升级</button>\n"\
                     "\t\t</form>"\
+                    "\t<p align=center><font size=\"1\" color=\"#333333\">HuangoGC</font></p>\n"\
                     "\t</div>\n"\
                     "</body>\n"\
                     "</html>"
 
 #define WIFI_HTML_INDEX  "<!DOCTYPE html>\n"\
-                    "<html>\n"\
-                    "<head>\n"\
-                    "\t<meta charset=\"utf-8\">\n"\
-                    "\t<title>OTA</title>\n"\
-                    "\t<link rel=\"stylesheet\" href=\"https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css\">\n"\
-                    "\t<style type=\"text/css\">\n"\
-                    "\t.box {\n"\
-                    "\t\tposition: absolute;\n"\
-                    "\t\ttop: 50%;\n"\
-                    "\t\tleft: 50%;"\
-                    "\t\tmargin: -150px 0 0 -150px;\n"\
-                    "\t\twidth: 300px;\n"\
-                    "\t\theight: 300px;\n"\
-                    "\t}\n"\
-                    "\t</style>\n"\
-                    "</head>\n"\
-                    "<body>\n"\
-                    "\t<div class=\"box\">\n"\
-                    "\t\t<form action=\"wifi\" method=\"post\">\n"\
-                    "\t\t\t<div class=\"form-group\">\n"\
-                    "\t\t\t<br>\n"\
-                    "\t\t\t\t<h1 class=\"text-center\">WIFI配置</h1>\n"\
-                    "\t\t\t\t<input type=\"text\" class=\"form-control\" id=\"ssid\" name=\"ssid\" placeholder=\"WIFI名称\">\n"\
-                    "\t\t\t<br>\n"\
-                    "\t\t\t\t<input type=\"text\" class=\"form-control\" id=\"password\" name=\"password\" placeholder=\"WIFI密码\">\n"\
-                    "\t\t\t</div>\n"\
-                    "\t\t\t<button type=\"submit\" name=\"submitOK\" class=\"btn btn-success\" style=\"width: 300px;\">确定</button>\n"\
-                    "\t\t</form>"\
-                    "\t</div>\n"\
-                    "</body>\n"\
-                    "</html>"
+                        "<html>\n"\
+                        "<head>\n"\
+                        "\t<meta charset=\"utf-8\">\n"\
+                        "\t<title>OTA</title>\n"\
+                        "\t<link rel=\"stylesheet\" href=\"https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css\">\n"\
+                        "\t<style type=\"text/css\">\n"\
+                        "\t.box {\n"\
+                        "\t\tposition: absolute;\n"\
+                        "\t\ttop: 50%;\n"\
+                        "\t\tleft: 50%;"\
+                        "\t\tmargin: -150px 0 0 -150px;\n"\
+                        "\t\twidth: 300px;\n"\
+                        "\t\theight: 300px;\n"\
+                        "\t}\n"\
+                        "\t</style>\n"\
+                        "</head>\n"\
+                        "<body>\n"\
+                        "\t<div class=\"box\">\n"\
+                        "\t\t<form action=\"wifi\" method=\"post\">\n"\
+                        "\t\t\t<div class=\"form-group\">\n"\
+                        "\t\t\t<br>\n"\
+                        "\t\t\t\t<h1 class=\"text-center\">WIFI配置</h1>\n"\
+                        "\t\t\t\t<input type=\"text\" class=\"form-control\" id=\"ssid\" name=\"ssid\" placeholder=\"WIFI名称\">\n"\
+                        "\t\t\t<br>\n"\
+                        "\t\t\t\t<input type=\"text\" class=\"form-control\" id=\"password\" name=\"password\" placeholder=\"WIFI密码\">\n"\
+                        "\t\t\t</div>\n"\
+                        "\t\t\t<button type=\"submit\" name=\"submitOK\" class=\"btn btn-success\" style=\"width: 300px;\">确定</button>\n"\
+                        "\t\t</form>"\
+                        "\t<p align=center><font size=\"1\" color=\"#333333\">HuangoGC</font></p>\n"\
+                        "\t</div>\n"\
+                        "</body>\n"\
+                        "</html>"
+
+#define SCCESS_HTML_INDEX   "<!DOCTYPE html>\n"\
+                            "<html>\n"\
+                            "<head>\n"\
+                            "\t<meta charset=\"utf-8\">\n"\
+                            "\t<title>OTA</title>\n"\
+                            "\t<link rel=\"stylesheet\" href=\"https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css\">\n"\
+                            "\t<style type=\"text/css\">\n"\
+                            "\t.box {\n"\
+                            "\t\tposition: absolute;\n"\
+                            "\t\ttop: 50%;\n"\
+                            "\t\tleft: 50%;"\
+                            "\t\tmargin: -150px 0 0 -150px;\n"\
+                            "\t\twidth: 300px;\n"\
+                            "\t\theight: 300px;\n"\
+                            "\t}\n"\
+                            "\t</style>\n"\
+                            "</head>\n"\
+                            "<body>\n"\
+                            "\t<div class=\"box\">\n"\
+                            "\t\t<h1 class=\"text-center\">提交成功</h1>\n"\
+                            "\t\t<br>\n"\
+                            "\t\t<button class=\"btn btn-primary\" style=\"width: 300px;\">确定</button>\n"\
+                            "\t\t<p align=center><font size=\"1\" color=\"#333333\">HuangoGC</font></p>\n"\
+                            "\t</div>\n"\
+                            "</body>\n"\
+                            "</html>"
 
 #endif
