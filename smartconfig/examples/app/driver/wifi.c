@@ -189,7 +189,7 @@ smartconfig_done(sc_status status, void *pdata) {
 void wifi_handle_event_cb(System_Event_t *evt)
 {
     switch	(evt->event)	{
-    case EVENT_STAMODE_CONNECTED:
+    case EVENT_STAMODE_GOT_IP:
         INFO("connect to ssid %s\n",evt->event_info.connected.ssid);
 		connect_flag = 1;
 		if(w_connect != NULL){
