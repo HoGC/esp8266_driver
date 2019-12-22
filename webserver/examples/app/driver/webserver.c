@@ -1,5 +1,5 @@
 /*
- * webconfig driver
+ * webserver driver
  * Author: HoGC 
  */
 #include "os_type.h"
@@ -11,7 +11,7 @@
 #include "driver/ota.h"
 #include "driver/webserver.h"
 
-//#define  WEBSERVER_DEBUG_ON
+#define  WEBSERVER_DEBUG_ON
 
 #if defined(WEBSERVER_DEBUG_ON)
 #define INFO( format, ... ) os_printf( format, ## __VA_ARGS__ )
@@ -19,7 +19,9 @@
 #define INFO( format, ... )
 #endif
 
+os_timer_t OS_Timer_WIFI;
 webserver_cd_t webserver_cd = NULL;
+char url[100] = {};
 
 /**
  * Funtion 字符串转数字
@@ -84,7 +86,7 @@ void data_send(void *arg, bool responseOK, char *psend) {
 	char httphead[256];
 	struct espconn *ptrespconn = arg;
 	os_memset(httphead, 0, 256);
-
+	INFO("\r\n%s\r\n",psend);
 	if (responseOK) {
 		os_sprintf(httphead,
 				"HTTP/1.0 200 OK\r\nContent-Length: %d\r\nServer: lwIP/1.4.0\r\n",
@@ -351,11 +353,14 @@ void ICACHE_FLASH_ATTR webserver_wifi_connect(char *psend) {
 	char buf[20];
 	struct station_config stationConf;
 
+	os_memset(&stationConf, 0, sizeof(struct station_config));
+	
 	PA = os_strstr(psend, "ssid");
 	PA = PA + os_strlen("ssid") + 1;
 	PB = os_strstr(PA, "&password");
 
 	if (os_strlen(PA) - os_strlen(PB) != 0) {
+		
 
 		os_strncpy(buf, PA, os_strlen(PA) - os_strlen(PB));
 		buf[(os_strlen(PA) - os_strlen(PB))] = '\0';
@@ -374,9 +379,10 @@ void ICACHE_FLASH_ATTR webserver_wifi_connect(char *psend) {
         }
 		INFO("ssid:%s\n",stationConf.ssid);
         INFO("password:%s\n",stationConf.password);
-		wifi_station_set_config(&stationConf);
-		wifi_station_disconnect();
         wifi_set_opmode(STATION_MODE);
+		wifi_station_disconnect();
+		os_delay_us(500);
+		wifi_station_set_config(&stationConf);
 		os_delay_us(500);
 		wifi_station_connect();
 	} else {
@@ -388,7 +394,7 @@ void ICACHE_FLASH_ATTR webserver_wifi_connect(char *psend) {
 /**
  * 	ota升级回调
  */
-void ICACHE_FLASH_ATTR webserver_ota_callback(void * arg) {
+void ICACHE_FLASH_ATTR webserver_ota_callback(void *arg) {
 	struct upgrade_server_info *update = arg;
 	if (update->upgrade_flag == true) {
 		INFO("webconfig OTA  Success ! rebooting!\n");
@@ -398,11 +404,31 @@ void ICACHE_FLASH_ATTR webserver_ota_callback(void * arg) {
 	}
 }
 
+// IP定时检查的回调函数
+void ICACHE_FLASH_ATTR WIFI_check_cb(void *arg) {
+
+	struct ip_info ST_ESP8266_IP;	// ESP8266的IP信息
+	u8 ESP8266_IP[4];				// ESP8266的IP地址
+	static u8 ckeck_count = 0;
+	u8 S_WIFI_STA_Connect = wifi_station_get_connect_status();
+	if (S_WIFI_STA_Connect == STATION_GOT_IP)	// 判断是否获取IP
+	{
+		ckeck_count = 0;
+		os_timer_disarm(&OS_Timer_WIFI);
+		INFO("\nstart_ota_url:%s\n",url);
+		ota_upgrade(url,webserver_ota_callback);
+	}
+	ckeck_count++;
+	if(ckeck_count >= 20){
+		ckeck_count = 0;
+		os_timer_disarm(&OS_Timer_WIFI);
+	}
+}
+
 void ICACHE_FLASH_ATTR webserver_ota_url(char *psend) {
 	char *PA;
 	char *PB;
-	char url[40];
-
+	os_memset(url, 0, sizeof(url));
 	PA = os_strstr(psend, "otaurl");
 	PA = PA + os_strlen("otaurl") + 1;
 	PB = os_strstr(PA, "&submitOK");
@@ -411,12 +437,22 @@ void ICACHE_FLASH_ATTR webserver_ota_url(char *psend) {
 		url[os_strlen(PA) - os_strlen(PB)] = '\0';
 		urldecode(url);
 		INFO("\notaurl:%s\n",url);
-		ota_upgrade(url,webserver_ota_callback);
+		if(wifi_get_opmode() == STATION_MODE){
+			ota_upgrade(url,webserver_ota_callback);
+		}else{
+			wifi_set_opmode(STATION_MODE);
+			wifi_station_connect();
+			// 检查wifi连接 连接成功则开始ota
+			os_timer_disarm(&OS_Timer_WIFI);	// 关闭定时器
+			os_timer_setfn(&OS_Timer_WIFI, (os_timer_func_t *) WIFI_check_cb, NULL);	// 设置定时器
+			os_timer_arm(&OS_Timer_WIFI, 1000, 1);  // 使能定时器
+		}
 	}
+		
 }
 
 //网页配置初始化
-void webserver_init(webserver_cd_t u_webserver_cd) {
+void webserver_init( webserver_cd_t u_webserver_cd) {
 
 	webserver_cd = u_webserver_cd;
 
@@ -429,4 +465,3 @@ void webserver_init(webserver_cd_t u_webserver_cd) {
 	espconn_regist_connectcb(&esp_conn, webserver_listen);
 	espconn_accept(&esp_conn);
 }
-

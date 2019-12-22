@@ -1,28 +1,27 @@
 /*
- * webconfig driver
+ * webserver driver
  * Author: HoGC 
  */
 #include "os_type.h"
-#include "driver/webconfig.h"
 #include "osapi.h"
 #include "user_interface.h"
 #include "espconn.h"
 #include "spi_flash.h"
 #include "mem.h"
 #include "driver/ota.h"
+#include "driver/webserver.h"
 
-#define  WEBCONFIG_DEBUG_ON
+#define  WEBSERVER_DEBUG_ON
 
-#if defined(WEBCONFIG_DEBUG_ON)
+#if defined(WEBSERVER_DEBUG_ON)
 #define INFO( format, ... ) os_printf( format, ## __VA_ARGS__ )
 #else
 #define INFO( format, ... )
 #endif
 
-config_cd_t config_cd = NULL;
-
-u8 location[20];
-#define BURSIZE 2048
+os_timer_t OS_Timer_WIFI;
+webserver_cd_t webserver_cd = NULL;
+char url[100] = {};
 
 /**
  * Funtion 字符串转数字
@@ -87,7 +86,7 @@ void data_send(void *arg, bool responseOK, char *psend) {
 	char httphead[256];
 	struct espconn *ptrespconn = arg;
 	os_memset(httphead, 0, 256);
-
+	INFO("\r\n%s\r\n",psend);
 	if (responseOK) {
 		os_sprintf(httphead,
 				"HTTP/1.0 200 OK\r\nContent-Length: %d\r\nServer: lwIP/1.4.0\r\n",
@@ -200,6 +199,15 @@ void parse_url(char *precv, URL_Frame *purl_frame) {
 	}
 }
 
+void webserver_delay_ms(int time){
+	while (time--)
+	{
+		os_delay_us(10000);
+		system_soft_wdt_feed();
+	}
+	
+}
+
 void webserver_recv(void *arg, char *pusrdata, unsigned short length) {
 	URL_Frame *pURL_Frame = NULL;
 	char *pParseBuffer = NULL;
@@ -207,9 +215,6 @@ void webserver_recv(void *arg, char *pusrdata, unsigned short length) {
 	int html_file_size = 0;
 
 	SpiFlashOpResult ret = 0;
-	// INFO("len:%u\r\n", length);
-	// INFO("Webserver recv:-------------------------------\r\n%s\r\n",
-			// pusrdata);
 	pURL_Frame = (URL_Frame *) os_zalloc(sizeof(URL_Frame));
 	parse_url(pusrdata, pURL_Frame);
 
@@ -226,7 +231,7 @@ void webserver_recv(void *arg, char *pusrdata, unsigned short length) {
 				goto _temp_exit;
 			}
 			index = os_memcpy(index,HTML_INDEX,html_file_size);
-			index[html_file_size] = 0;   // put 0 to the end
+			index[html_file_size] = 0;  
 			data_send(arg, true, index);
 			os_free(index);
 			index = NULL;
@@ -238,7 +243,7 @@ void webserver_recv(void *arg, char *pusrdata, unsigned short length) {
 				goto _temp_exit;
 			}
 			index = os_memcpy(index,OTA_HTML_INDEX,html_file_size);
-			index[html_file_size] = 0;   // put 0 to the end
+			index[html_file_size] = 0;  
 			data_send(arg, true, index);
 			os_free(index);
 			index = NULL;
@@ -250,7 +255,7 @@ void webserver_recv(void *arg, char *pusrdata, unsigned short length) {
 				goto _temp_exit;
 			}
 			index = os_memcpy(index,WIFI_HTML_INDEX,html_file_size);
-			index[html_file_size] = 0;   // put 0 to the end
+			index[html_file_size] = 0;   
 			data_send(arg, true, index);
 			os_free(index);
 			index = NULL;
@@ -267,14 +272,25 @@ void webserver_recv(void *arg, char *pusrdata, unsigned short length) {
 		}
 		
 		if(strcmp(pURL_Frame->pFilename,"ota")==0){
-			data_send(arg, false, NULL);
-			webconfig_ota_url(pusrdata);
+			html_file_size = os_strlen(SCCESS_HTML_INDEX);
+			index = (char *) os_zalloc(html_file_size+1);
+			if (index == NULL) {
+				INFO("os_zalloc error!\r\n");
+				goto _temp_exit;
+			}
+			index = os_memcpy(index,SCCESS_HTML_INDEX,html_file_size);
+			index[html_file_size] = 0;   
+			data_send(arg, true, index);
+			os_free(index);
+			index = NULL;
+			webserver_delay_ms(50);
+			webserver_ota_url(pusrdata);
 		}else if(strcmp(pURL_Frame->pFilename,"wifi")==0){
 			data_send(arg, false, NULL);
-			webconfig_wifi_connect(pusrdata);
+			webserver_wifi_connect(pusrdata);
 		}
-		if(config_cd != NULL){
-			config_cd(pusrdata,length);
+		if(webserver_cd != NULL){
+			webserver_cd(pusrdata,length);
 		}
 		break;
 	}
@@ -329,7 +345,7 @@ void webserver_recon(void *arg, sint8 err) {
 }
 
 //提取网页返回的wifi信息，并连接到wifi
-void ICACHE_FLASH_ATTR webconfig_wifi_connect(char *psend) {
+void ICACHE_FLASH_ATTR webserver_wifi_connect(char *psend) {
 	char *PA;
 	char *PB;
 	char *PA1;
@@ -337,11 +353,14 @@ void ICACHE_FLASH_ATTR webconfig_wifi_connect(char *psend) {
 	char buf[20];
 	struct station_config stationConf;
 
+	os_memset(&stationConf, 0, sizeof(struct station_config));
+	
 	PA = os_strstr(psend, "ssid");
 	PA = PA + os_strlen("ssid") + 1;
 	PB = os_strstr(PA, "&password");
 
 	if (os_strlen(PA) - os_strlen(PB) != 0) {
+		
 
 		os_strncpy(buf, PA, os_strlen(PA) - os_strlen(PB));
 		buf[(os_strlen(PA) - os_strlen(PB))] = '\0';
@@ -360,9 +379,10 @@ void ICACHE_FLASH_ATTR webconfig_wifi_connect(char *psend) {
         }
 		INFO("ssid:%s\n",stationConf.ssid);
         INFO("password:%s\n",stationConf.password);
-		wifi_station_set_config(&stationConf);
-		wifi_station_disconnect();
         wifi_set_opmode(STATION_MODE);
+		wifi_station_disconnect();
+		os_delay_us(500);
+		wifi_station_set_config(&stationConf);
 		os_delay_us(500);
 		wifi_station_connect();
 	} else {
@@ -374,7 +394,7 @@ void ICACHE_FLASH_ATTR webconfig_wifi_connect(char *psend) {
 /**
  * 	ota升级回调
  */
-void ICACHE_FLASH_ATTR webconfig_ota_callback(void * arg) {
+void ICACHE_FLASH_ATTR webserver_ota_callback(void *arg) {
 	struct upgrade_server_info *update = arg;
 	if (update->upgrade_flag == true) {
 		INFO("webconfig OTA  Success ! rebooting!\n");
@@ -384,11 +404,31 @@ void ICACHE_FLASH_ATTR webconfig_ota_callback(void * arg) {
 	}
 }
 
-void ICACHE_FLASH_ATTR webconfig_ota_url(char *psend) {
+// IP定时检查的回调函数
+void ICACHE_FLASH_ATTR WIFI_check_cb(void *arg) {
+
+	struct ip_info ST_ESP8266_IP;	// ESP8266的IP信息
+	u8 ESP8266_IP[4];				// ESP8266的IP地址
+	static u8 ckeck_count = 0;
+	u8 S_WIFI_STA_Connect = wifi_station_get_connect_status();
+	if (S_WIFI_STA_Connect == STATION_GOT_IP)	// 判断是否获取IP
+	{
+		ckeck_count = 0;
+		os_timer_disarm(&OS_Timer_WIFI);
+		INFO("\nstart_ota_url:%s\n",url);
+		ota_upgrade(url,webserver_ota_callback);
+	}
+	ckeck_count++;
+	if(ckeck_count >= 20){
+		ckeck_count = 0;
+		os_timer_disarm(&OS_Timer_WIFI);
+	}
+}
+
+void ICACHE_FLASH_ATTR webserver_ota_url(char *psend) {
 	char *PA;
 	char *PB;
-	char url[40];
-
+	os_memset(url, 0, sizeof(url));
 	PA = os_strstr(psend, "otaurl");
 	PA = PA + os_strlen("otaurl") + 1;
 	PB = os_strstr(PA, "&submitOK");
@@ -397,20 +437,24 @@ void ICACHE_FLASH_ATTR webconfig_ota_url(char *psend) {
 		url[os_strlen(PA) - os_strlen(PB)] = '\0';
 		urldecode(url);
 		INFO("\notaurl:%s\n",url);
-		ota_upgrade(url,webconfig_ota_callback);
+		if(wifi_get_opmode() == STATION_MODE){
+			ota_upgrade(url,webserver_ota_callback);
+		}else{
+			wifi_set_opmode(STATION_MODE);
+			wifi_station_connect();
+			// 检查wifi连接 连接成功则开始ota
+			os_timer_disarm(&OS_Timer_WIFI);	// 关闭定时器
+			os_timer_setfn(&OS_Timer_WIFI, (os_timer_func_t *) WIFI_check_cb, NULL);	// 设置定时器
+			os_timer_arm(&OS_Timer_WIFI, 1000, 1);  // 使能定时器
+		}
 	}
+		
 }
 
 //网页配置初始化
-void webconfig_init(char *ssidname, config_cd_t u_config_cd) {
+void webserver_init( webserver_cd_t u_webserver_cd) {
 
-	config_cd = u_config_cd;
-	// wifi_set_opmode(SOFTAP_MODE);
-	// struct softap_config stationConf;
-	// wifi_softap_get_config(&stationConf);
-	// os_strcpy(stationConf.ssid, ssidname);
-	// stationConf.ssid_len = os_strlen(ssidname);
-	// wifi_softap_set_config_current(&stationConf);
+	webserver_cd = u_webserver_cd;
 
 	LOCAL struct espconn esp_conn;
 	LOCAL esp_tcp esptcp;
@@ -421,4 +465,3 @@ void webconfig_init(char *ssidname, config_cd_t u_config_cd) {
 	espconn_regist_connectcb(&esp_conn, webserver_listen);
 	espconn_accept(&esp_conn);
 }
-

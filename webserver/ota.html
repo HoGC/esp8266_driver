@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>OTA</title>
+	<style type="text/css">
+	* {
+		box-sizing: border-box;
+	}
+	body {
+		line-height: 1;
+	}
+	a {
+		text-decoration: none;
+	}
+	p {
+		margin: 0 0 10px;
+	}
+	h1 {
+		display: block;
+		font-size: 36px;
+		margin-block-start: 0.67em;
+		margin-block-end: 0.67em;
+		margin-inline-start: 0px;
+		margin-inline-end: 0px;
+		font-family: inherit;
+		font-weight: 500;
+		line-height: 1.1;
+		color: inherit;
+		margin-top: 20px;
+		margin-bottom: 20px
+	}
+	.box {
+		position: absolute;
+		top: 50%;
+		left: 50%;		margin: -150px 0 0 -150px;
+		width: 300px;
+		height: 300px
+	}
+	.text-center {
+		text-align: center;
+	}
+	.form-control {
+		display: block;
+		width: 100%;
+		height: 34px;
+		padding: 6px 12px;
+		font-size: 14px;
+		line-height: 1.42857143;
+		color: #555;
+		background-color: #fff;
+		background-image: none;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		box-shadow: inset 0 1px 1px rgba(0,0,0,.075);
+		transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s
+	}
+	.btn {
+		display: inline-block;
+		padding: 6px 12px;
+		margin-bottom: 0;
+		font-size: 14px;
+		font-weight: 400;
+		line-height: 1.42857143;
+		text-align: center;
+		white-space: nowrap;
+		vertical-align: middle;
+		touch-action: manipulation;
+		cursor: pointer;
+		user-select: none;
+		background-image: none;
+		border: 1px solid transparent;
+		border-radius: 4px
+	}
+	.btn-primary{
+		color:#fff;
+		background-color:#337ab7;
+		border-color:#2e6da4
+	}
+	.btn-primary:hover{
+		color:#fff;
+		background-color:#286090;
+		border-color:#204d74
+	}
+	</style>
+</head>
+<body>
+	<div class="box">
+		<form action="ota" method="post">
+			<div class="form-group">
+				<h1 class="text-center">ESP OTA 升级</h1>
+				<input type="text" class="form-control" id="url" name="otaurl" placeholder="http://yourdomain.com:9001/ota/">
+			</div>
+			<br>
+			<button type="submit" name="submitOK" class="btn btn-primary" style="width: 300px;">开始升级</button>
+		</form>	<p align=center><font size="1" color="#333333">HoGC</font></p>
+	</div>
+</body>
+</html>
