@@ -180,7 +180,7 @@ smartconfig_done(sc_status status, void *pdata) {
 		connect_flag = 0;
 		os_timer_disarm(&OS_Timer_SM);	// 关闭定时器
 		finish_cd(sm_comfig_status);
-		os_timer_arm(&OS_Timer_Wifichange, 3000, 1);  // 使能定时器
+		os_timer_arm(&OS_Timer_Wifichange, 5000, 1);  // 使能定时器
 		break;
 	}
 
@@ -204,7 +204,7 @@ void wifi_handle_event_cb(System_Event_t *evt)
 			if(w_disconnect != NULL){
 				w_disconnect();
 			}
-			os_timer_arm(&OS_Timer_Wifichange, 3000, 1);  // 使能定时器
+			os_timer_arm(&OS_Timer_Wifichange, 5000, 1);  // 使能定时器
 		}
         break;
     default:
@@ -217,12 +217,15 @@ void wifi_handle_event_cb(System_Event_t *evt)
  * @retval None
  */
 void ICACHE_FLASH_ATTR wifi_ap_change(void) {
-	int ap_id;
-	ap_id = wifi_station_get_current_ap_id();
-	ap_id = ++ap_id % AP_INFO_MAX;
-	INFO("AP_ID : %d", ap_id);
-	wifi_station_disconnect();
-	wifi_station_ap_change(ap_id);
+
+	if(wifi_get_opmode() == STATION_MODE){
+		int ap_id;
+		ap_id = wifi_station_get_current_ap_id();
+		ap_id = ++ap_id % AP_INFO_MAX;
+		INFO("AP_ID : %d", ap_id);
+		wifi_station_disconnect();
+		wifi_station_ap_change(ap_id);
+	}
 }
 
 
@@ -244,7 +247,7 @@ void ICACHE_FLASH_ATTR sm_wait_time() {
 		connect_flag = 0;
 		os_timer_disarm(&OS_Timer_SM);	// 关闭定时器
 		finish_cd(sm_comfig_status);
-		os_timer_arm(&OS_Timer_Wifichange, 3000, 1);  // 使能定时器
+		os_timer_arm(&OS_Timer_Wifichange, 5000, 1);  // 使能定时器
 	}
 	wait_wait++;
 }
@@ -256,12 +259,12 @@ void ICACHE_FLASH_ATTR sm_wait_time() {
  */
 void ICACHE_FLASH_ATTR start_smartconfig(smartconfig_cd_t cd) {
 	smartconfig_flag = 1;
+	os_timer_disarm(&OS_Timer_Wifichange);	// 关闭定时器
 	smartconfig_set_type(SC_TYPE_ESPTOUCH_AIRKISS); //SC_TYPE_ESPTOUCH,SC_TYPE_AIRKISS,SC_TYPE_ESPTOUCH_AIRKISS
 	wifi_station_disconnect();
 	wifi_set_opmode(STATION_MODE);
 	finish_cd = cd;
 	smartconfig_start(smartconfig_done);
-	os_timer_disarm(&OS_Timer_Wifichange);	// 关闭定时器
 
 	if(connect_flag == 1){
 		w_disconnect();
@@ -326,5 +329,5 @@ void ICACHE_FLASH_ATTR set_wifistate_cb(wifconnect_cb_t u_connect_cb, wifdisconn
 
 	os_timer_disarm(&OS_Timer_Wifichange);	// 关闭定时器
 	os_timer_setfn(&OS_Timer_Wifichange, (os_timer_func_t *) wifi_ap_change,NULL);// 设置定时器
-	os_timer_arm(&OS_Timer_Wifichange, 3000, 1);  // 使能定时器
+	os_timer_arm(&OS_Timer_Wifichange, 5000, 1);  // 使能定时器
 }
