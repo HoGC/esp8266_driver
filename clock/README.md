@@ -54,12 +54,12 @@ void ICACHE_FLASH_ATTR clock_test(void){
     //添加每天的定时
     timer_id2 = clock_add_everyday_timer(time2, TASK3_ID);
 
-    //修改定时任务
-    clock_str_to_time("12:02:00", &time0);
-    clock_set_time_timer(timer_id0, time0);
-    //修改定时任务(带修改重复日期)
-    clock_str_to_time("12:03:00", &time0);
-    clock_set_timer(timer_id0, time0, (WEEK_SUN | WEEK_SAT));
+    // //修改定时任务
+    // clock_str_to_time("12:02:00", &time0);
+    // clock_set_time_timer(timer_id0, time0);
+    // //修改定时任务(带修改重复日期)
+    // clock_str_to_time("12:03:00", &time0);
+    // clock_set_timer(timer_id0, time0, (WEEK_SUN | WEEK_SAT));
     
     //关闭定时任务
     clock_close_timer(timer_id0);
@@ -68,8 +68,9 @@ void ICACHE_FLASH_ATTR clock_test(void){
     //删除定时任务
     clock_delete_timer(timer_id2);
 
-    //注意: 因有掉电保护功能 每次重启都会添加 实际使用请勿这样使用
-
+    //注意: 
+    //因有掉电保护功能 每次添加的都会被保存到flash中 
+    //同时每次添加都会检验  无法添加（时间 重复周期 任务id）相同的定时
 
 
     //------------------------------

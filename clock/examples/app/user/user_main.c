@@ -103,12 +103,12 @@ void ICACHE_FLASH_ATTR clock_test(void){
     //添加每天的定时
     timer_id2 = clock_add_everyday_timer(time2, TASK3_ID);
 
-    //修改定时任务
-    clock_str_to_time("12:02:00", &time0);
-    clock_set_time_timer(timer_id0, time0);
-    //修改定时任务(带修改重复日期)
-    clock_str_to_time("12:03:00", &time0);
-    clock_set_timer(timer_id0, time0, (WEEK_SUN | WEEK_SAT));
+    // //修改定时任务
+    // clock_str_to_time("12:02:00", &time0);
+    // clock_set_time_timer(timer_id0, time0);
+    // //修改定时任务(带修改重复日期)
+    // clock_str_to_time("12:03:00", &time0);
+    // clock_set_timer(timer_id0, time0, (WEEK_SUN | WEEK_SAT));
     
     //关闭定时任务
     clock_close_timer(timer_id0);

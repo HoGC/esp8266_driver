@@ -25,6 +25,16 @@ void ICACHE_FLASH_ATTR calculation_time_count(clock_time_t *time){
 	time->time_count = ((time->hour*60*60) + (time->minute*60) + time->seconds);
 }
 
+uint8_t ICACHE_FLASH_ATTR verify_time_info(clock_time_t *time){
+
+	if((time->hour < 24 ) && (time->minute < 60 ) && (time->seconds < 60 )){
+		calculation_time_count(time);
+		return 1;
+	}else{
+		return 0;
+	}	
+}
+
 void ICACHE_FLASH_ATTR parse_time_count(clock_time_t *time) {
 	time->hour = (time->time_count / 3600); 
 	time->minute = ((time->time_count % 3600) / 60); 
@@ -185,41 +195,85 @@ int ICACHE_FLASH_ATTR clock_add_everyday_timer(clock_time_t time, int task_id){
 	return clock_add_timer(time, WEEK_EVERY, task_id);
 }
 
-void ICACHE_FLASH_ATTR clock_get_timer(int id, user_timer_t *user_timer){
+int ICACHE_FLASH_ATTR clock_get_timer(int id, user_timer_t *user_timer){
 	int timer_id;
 	timer_id = id - TIMER_STATIC_ID;
-	user_timer = &user_timer[timer_id];
+	if((timer_id < USER_TIMER_MIX) || (user_timer[timer_id].id == id)){
+		user_timer = &user_timer[timer_id];
+		return TIMER_SUCCEED;
+	}else{
+		return TIMER_NONENTITY;
+	}
 }
 
-void ICACHE_FLASH_ATTR clock_set_time_timer(int id, clock_time_t time){
+int ICACHE_FLASH_ATTR clock_set_time_timer(int id, clock_time_t time){
 	INFO("set_timer%d: %02d:%02d:%02d",id, time.hour, time.minute, time.seconds);
-
-	int timer_id;
-	timer_id = id - TIMER_STATIC_ID;
-	user_timer[timer_id].res = 1;
-	calculation_time_count(&time);
-	user_timer[timer_id].time = time;
 	
-	clock_flash_write_timer();
+	if(verify_time_info(&time)){
+		uint8_t i;
+		int timer_id;
+		timer_id = id - TIMER_STATIC_ID;
+		if((timer_id < USER_TIMER_MIX) || (user_timer[timer_id].id == id)){
+			for (i = 0; i < USER_TIMER_MIX; i++)
+			{
+				if(user_timer[i].time.time_count == time.time_count){
+					if(user_timer[i].task_id == user_timer[timer_id].task_id){
+						return TIMER_REPEAT;
+					}
+				}
+			}
+			user_timer[timer_id].res = 1;
+			user_timer[timer_id].time = time;
+			clock_flash_write_timer();
+			return TIMER_SUCCEED;
+		}else{
+			return TIMER_NONENTITY;
+		}
+	}else{
+		return TIMER_INFO_ERROR;
+	}
+	
 }
 
-void ICACHE_FLASH_ATTR clock_set_timer(int id, clock_time_t time, uint8_t week_bit){
+int ICACHE_FLASH_ATTR clock_set_timer(int id, clock_time_t time, uint8_t week_bit){
 	INFO("set_timer%d: %02d:%02d:%02d\n",id, time.hour, time.minute, time.seconds);
 
-	int timer_id;
-	timer_id = id - TIMER_STATIC_ID;
-	user_timer[timer_id].res = 1;
-	user_timer[timer_id].week_bit = week_bit;
-	calculation_time_count(&time);
-	user_timer[timer_id].time = time;
-
-	clock_flash_write_timer();
+	if(verify_time_info(&time)){
+		uint8_t i;
+		int timer_id;
+		timer_id = id - TIMER_STATIC_ID;
+		if((timer_id < USER_TIMER_MIX) || (user_timer[timer_id].id == id)){
+			for (i = 0; i < USER_TIMER_MIX; i++)
+			{
+				if(user_timer[i].time.time_count = time.time_count){
+					if(user_timer[i].task_id == user_timer[timer_id].task_id){
+						return TIMER_REPEAT;
+					}
+				}
+			}
+			user_timer[timer_id].res = 1;
+			user_timer[timer_id].week_bit = week_bit;
+			calculation_time_count(&time);
+			user_timer[timer_id].time = time;
+			clock_flash_write_timer();
+			return TIMER_SUCCEED;
+		}else{
+			return TIMER_NONENTITY;
+		}
+	}else{
+		return TIMER_INFO_ERROR;
+	}
 }
 
 int ICACHE_FLASH_ATTR clock_add_timer(clock_time_t time, uint8_t week_bit, int task_id){
 
 	uint8_t i;
-	if((time.hour < 24 ) && (time.minute < 60 ) && (time.seconds < 60 )){
+	if(verify_time_info(&time)){
+		for(i = 0; i < USER_TIMER_MIX; i++){
+			if((user_timer[i].time.time_count == time.time_count) && (user_timer[i].week_bit == week_bit) && (user_timer[i].task_id == task_id)){
+				return TIMER_REPEAT;
+			}
+		}
 		for(i = 0; i < USER_TIMER_MIX; i++){
 			if(user_timer[i].week_bit == 0){
 				INFO("add_timer%d: %02d:%02d:%02d\n",i, time.hour, time.minute, time.seconds);
@@ -228,48 +282,63 @@ int ICACHE_FLASH_ATTR clock_add_timer(clock_time_t time, uint8_t week_bit, int t
 				user_timer[i].res = 1;
 				user_timer[i].week_bit = week_bit;
 				user_timer[i].task_id = task_id;
-				calculation_time_count(&time);
 				user_timer[i].time = time;
 
 				clock_flash_write_timer();
 				return TIMER_STATIC_ID + i;
 			}
 		}
+		return TIMER_FULL;
+	}else{
+		return TIMER_INFO_ERROR;
 	}
-	return 0;
 }
 
-void ICACHE_FLASH_ATTR clock_close_timer(int id){
+int ICACHE_FLASH_ATTR clock_close_timer(int id){
 	INFO("close_timer%d\n",id);
 
 	int timer_id;
 	timer_id = id - TIMER_STATIC_ID;
-	user_timer[timer_id].status = 0;
+	if((timer_id < USER_TIMER_MIX) || (user_timer[timer_id].id == id)){
+		user_timer[timer_id].status = 0;
+		clock_flash_write_timer();
+		return TIMER_SUCCEED;
+	}else{
+		return TIMER_NONENTITY;
+	}
+	
 
-	clock_flash_write_timer();
 }
 
-void ICACHE_FLASH_ATTR clock_open_timer(int id){
+int ICACHE_FLASH_ATTR clock_open_timer(int id){
 	INFO("open_timer%d\n",id);
 
 	int timer_id;
 	timer_id = id - TIMER_STATIC_ID;
-	user_timer[timer_id].status = 1;
-	user_timer[timer_id].res = 1;
-
-	clock_flash_write_timer();
+	if((timer_id < USER_TIMER_MIX) || (user_timer[timer_id].id == id)){
+		user_timer[timer_id].status = 1;
+		user_timer[timer_id].res = 1;
+		clock_flash_write_timer();
+		return TIMER_SUCCEED;
+	}else{
+		return TIMER_NONENTITY;
+	}
 }
 
-void ICACHE_FLASH_ATTR clock_delete_timer(int id){
+int ICACHE_FLASH_ATTR clock_delete_timer(int id){
 	INFO("delete_timer%d\n",id);
 
 	int timer_id;
 	timer_id = id - TIMER_STATIC_ID;
-	user_timer[timer_id].status = 0;
-	user_timer[timer_id].res = 0;
-	user_timer[timer_id].week_bit = 0;
-
-	clock_flash_write_timer();
+	if((timer_id < USER_TIMER_MIX) || (user_timer[timer_id].id == id)){
+		user_timer[timer_id].status = 0;
+		user_timer[timer_id].res = 0;
+		user_timer[timer_id].week_bit = 0;
+		clock_flash_write_timer();
+		return TIMER_SUCCEED;
+	}else{
+		return TIMER_NONENTITY;
+	}
 }
 
 void clock_timer_cb(void){

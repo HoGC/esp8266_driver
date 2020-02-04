@@ -22,6 +22,12 @@
 
 #define WEEK_EVERY						   0x7F
 
+#define TIMER_SUCCEED                      501
+#define TIMER_REPEAT                       502
+#define TIMER_FULL                   	   503
+#define TIMER_NONENTITY                    504
+#define TIMER_INFO_ERROR                   505
+
 typedef struct{
 	int hour;
 	int minute;
@@ -61,18 +67,18 @@ void ICACHE_FLASH_ATTR clock_get_day_time(day_time_t *day_time);
 void ICACHE_FLASH_ATTR clock_str_to_time(char *time_str, clock_time_t *time);
 
 //关闭定时任务
-void ICACHE_FLASH_ATTR clock_close_timer(int id);
+int ICACHE_FLASH_ATTR clock_close_timer(int id);
  //开启定时任务
-void ICACHE_FLASH_ATTR clock_open_timer(int id);
+int ICACHE_FLASH_ATTR clock_open_timer(int id);
 //删除定时任务
-void ICACHE_FLASH_ATTR clock_delete_timer(int id);
+int ICACHE_FLASH_ATTR clock_delete_timer(int id);
 
 //获取定时任务
-void ICACHE_FLASH_ATTR clock_get_timer(int id, user_timer_t *user_timer);
+int ICACHE_FLASH_ATTR clock_get_timer(int id, user_timer_t *user_timer);
 //修改定时任务
-void ICACHE_FLASH_ATTR clock_set_time_timer(int id, clock_time_t time);
+int ICACHE_FLASH_ATTR clock_set_time_timer(int id, clock_time_t time);
 //修改定时任务(带修改重复日期)
-void ICACHE_FLASH_ATTR clock_set_timer(int id, clock_time_t time, uint8_t week_bit);
+int ICACHE_FLASH_ATTR clock_set_timer(int id, clock_time_t time, uint8_t week_bit);
 
 //添加定时任务 
 int ICACHE_FLASH_ATTR clock_add_today_timer(clock_time_t time, int task_id);
