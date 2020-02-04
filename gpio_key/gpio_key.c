@@ -390,7 +390,7 @@ void ICACHE_FLASH_ATTR gpio_disout_init(uint8 gpio_id) {
 }
 
 //gpio写
-void ICACHE_FLASH_ATTR gpio_wirte(uint8 gpio_id, bool bit_value){
+void ICACHE_FLASH_ATTR gpio_write(uint8 gpio_id, bool bit_value){
 	if(gpio_id == D0)
 	{
 		gpio16_output_set(bit_value);

@@ -57,11 +57,11 @@ void ICACHE_FLASH_ATTR short_pres(void){
 }
 void ICACHE_FLASH_ATTR key_down(void){
     INFO("key_down\n");
-    gpio_wirte(D4,0);
+    gpio_write(D4,0);
 }
 void ICACHE_FLASH_ATTR key_up(void){
     INFO("key_up\n");
-    gpio_wirte(D4,1);
+    gpio_write(D4,1);
 }
 void ICACHE_FLASH_ATTR key_init(void){
     //设置按键数量

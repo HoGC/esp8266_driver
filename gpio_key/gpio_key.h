@@ -105,7 +105,7 @@ void ICACHE_FLASH_ATTR gpioInit(uint8 gpio_id);
 void ICACHE_FLASH_ATTR gpio_out_init(uint8 gpio_id, bool bit_value);
 void ICACHE_FLASH_ATTR gpio_disout_init(uint8 gpio_id);
 
-void ICACHE_FLASH_ATTR gpio_wirte(uint8 gpio_id, bool bit_value);
+void ICACHE_FLASH_ATTR gpio_write(uint8 gpio_id, bool bit_value);
 uint32 ICACHE_FLASH_ATTR gpio_read(uint8 gpio_id);
 
 void ICACHE_FLASH_ATTR set_key_num(u8 n);
