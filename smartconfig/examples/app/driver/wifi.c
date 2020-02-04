@@ -161,6 +161,7 @@ smartconfig_done(sc_status status, void *pdata) {
 		wifi_station_set_config(sta_conf);
 		wifi_station_disconnect();
 		wifi_station_connect();
+		os_timer_arm(&OS_Timer_Wifichange, 5000, 1);  // 使能定时器
 		break;
 	case SC_STATUS_LINK_OVER:
 		sm_comfig_status = SM_STATUS_FINISH;
@@ -180,7 +181,6 @@ smartconfig_done(sc_status status, void *pdata) {
 		connect_flag = 0;
 		os_timer_disarm(&OS_Timer_SM);	// 关闭定时器
 		finish_cd(sm_comfig_status);
-		os_timer_arm(&OS_Timer_Wifichange, 5000, 1);  // 使能定时器
 		break;
 	}
 
@@ -219,12 +219,16 @@ void wifi_handle_event_cb(System_Event_t *evt)
 void ICACHE_FLASH_ATTR wifi_ap_change(void) {
 
 	if(wifi_get_opmode() == STATION_MODE){
-		int ap_id;
-		ap_id = wifi_station_get_current_ap_id();
-		ap_id = ++ap_id % AP_INFO_MAX;
-		INFO("AP_ID : %d", ap_id);
-		wifi_station_disconnect();
-		wifi_station_ap_change(ap_id);
+		struct station_config config[5];
+		int info_count = wifi_station_get_ap_info(config);
+		if(info_count > 1 ){
+			int ap_id;
+			ap_id = wifi_station_get_current_ap_id();
+			ap_id = ++ap_id % info_count;
+			INFO("AP_ID : %d", ap_id);
+			wifi_station_disconnect();
+			wifi_station_ap_change(ap_id);
+		}
 	}
 }
 
@@ -324,6 +328,8 @@ void ICACHE_FLASH_ATTR set_wifistate_cb(wifconnect_cb_t u_connect_cb, wifdisconn
 		INFO("ssid : %s\n", config[i].ssid);
 		INFO("password : %s\n", config[i].password);
 	}
+
+	wifi_station_connect(); 
 
 	wifi_set_event_handler_cb(wifi_handle_event_cb);
 
