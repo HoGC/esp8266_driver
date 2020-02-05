@@ -12,7 +12,7 @@
 #include "airkiss.h"
 #include "driver/wifi.h"
 
-//#define WIFI_DEBUG_ON
+#define WIFI_DEBUG_ON
 
 #if defined(WIFI_DEBUG_ON)
 #define INFO( format, ... ) os_printf( format, ## __VA_ARGS__ )
@@ -161,7 +161,6 @@ smartconfig_done(sc_status status, void *pdata) {
 		wifi_station_set_config(sta_conf);
 		wifi_station_disconnect();
 		wifi_station_connect();
-		os_timer_arm(&OS_Timer_Wifichange, 5000, 1);  // 使能定时器
 		break;
 	case SC_STATUS_LINK_OVER:
 		sm_comfig_status = SM_STATUS_FINISH;
@@ -178,7 +177,7 @@ smartconfig_done(sc_status status, void *pdata) {
 		}
 		smartconfig_stop();
 		smartconfig_flag = 0;
-		connect_flag = 0;
+		os_timer_arm(&OS_Timer_Wifichange, 5000, 1);  // 使能定时器
 		os_timer_disarm(&OS_Timer_SM);	// 关闭定时器
 		finish_cd(sm_comfig_status);
 		break;
@@ -218,20 +217,26 @@ void wifi_handle_event_cb(System_Event_t *evt)
  */
 void ICACHE_FLASH_ATTR wifi_ap_change(void) {
 
-	uint8 wifi_mode;
-	wifi_mode = wifi_get_opmode();
-	if((wifi_mode == STATION_MODE) && (wifi_mode == STATIONAP_MODE)){
-		struct station_config config[5];
-		int info_count = wifi_station_get_ap_info(config);
-		if(info_count > 1 ){
-			int ap_id;
-			ap_id = wifi_station_get_current_ap_id();
-			ap_id = ++ap_id % info_count;
-			INFO("AP_ID : %d", ap_id);
-			wifi_station_disconnect();
-			wifi_station_ap_change(ap_id);
+	if(get_wifi_connect_status() == 0){
+		uint8 wifi_mode;
+		wifi_mode = wifi_get_opmode();
+		if((wifi_mode == STATION_MODE) && (wifi_mode == STATIONAP_MODE)){
+			struct station_config config[5];
+			int info_count = wifi_station_get_ap_info(config);
+			if(info_count > 1 ){
+				int ap_id;
+				ap_id = wifi_station_get_current_ap_id();
+				ap_id = ++ap_id % info_count;
+				INFO("AP_ID : %d", ap_id);
+				wifi_station_disconnect();
+				wifi_station_ap_change(ap_id);
+			}
 		}
+	}else{
+		os_timer_disarm(&OS_Timer_Wifichange);	// 关闭定时器
 	}
+	
+	
 }
 
 bool ICACHE_FLASH_ATTR get_wifi_connect_status(void){
