@@ -437,16 +437,13 @@ void ICACHE_FLASH_ATTR webserver_ota_url(char *psend) {
 		url[os_strlen(PA) - os_strlen(PB)] = '\0';
 		urldecode(url);
 		INFO("\notaurl:%s\n",url);
-		if(wifi_get_opmode() == STATION_MODE){
-			ota_upgrade(url,webserver_ota_callback);
-		}else{
-			wifi_set_opmode(STATION_MODE);
-			wifi_station_connect();
-			// 检查wifi连接 连接成功则开始ota
-			os_timer_disarm(&OS_Timer_WIFI);	// 关闭定时器
-			os_timer_setfn(&OS_Timer_WIFI, (os_timer_func_t *) WIFI_check_cb, NULL);	// 设置定时器
-			os_timer_arm(&OS_Timer_WIFI, 1000, 1);  // 使能定时器
-		}
+		// wifi_set_opmode(STATION_MODE);
+		wifi_station_connect();
+		// 检查wifi连接 连接成功则开始ota
+		os_timer_disarm(&OS_Timer_WIFI);	// 关闭定时器
+		os_timer_setfn(&OS_Timer_WIFI, (os_timer_func_t *) WIFI_check_cb, NULL);	// 设置定时器
+		os_timer_arm(&OS_Timer_WIFI, 1000, 1);  // 使能定时器
+
 	}
 		
 }
