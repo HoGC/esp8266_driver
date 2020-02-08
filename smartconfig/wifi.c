@@ -220,7 +220,7 @@ void ICACHE_FLASH_ATTR wifi_ap_change(void) {
 	if(get_wifi_connect_status() == 0){
 		uint8 wifi_mode;
 		wifi_mode = wifi_get_opmode();
-		if((wifi_mode == STATION_MODE) && (wifi_mode == STATIONAP_MODE)){
+		if((wifi_mode == STATION_MODE) || (wifi_mode == STATIONAP_MODE)){
 			struct station_config config[5];
 			int info_count = wifi_station_get_ap_info(config);
 			if(info_count > 1 ){
