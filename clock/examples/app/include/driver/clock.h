@@ -7,7 +7,7 @@
 #include "osapi.h"
 
 
-#define USER_TIMER_MIX 			10       //秒
+#define USER_TIMER_MIX 			10          //秒
 
 #define TIME_UPDATE_COUNT 		60*60       //秒
 
@@ -22,11 +22,14 @@
 
 #define WEEK_EVERY						   0x7F
 
-#define TIMER_SUCCEED                      501
-#define TIMER_REPEAT                       502
-#define TIMER_FULL                   	   503
-#define TIMER_NONENTITY                    504
-#define TIMER_INFO_ERROR                   505
+#define TIMER_SUCCEED                      501		//成功
+#define TIMER_REPEAT                       502		//已存在
+#define TIMER_FULL                   	   503		//满
+#define TIMER_NONENTITY                    504		//不存在
+#define TIMER_INFO_ERROR                   505		//输入信息有误
+#define TIMER_MODIFY                   	   506		//做了修改
+
+#define TIMER_STATIC_ID 				   1000
 
 typedef struct{
 	int hour;
@@ -65,6 +68,8 @@ uint8_t ICACHE_FLASH_ATTR clock_update(void);
 void ICACHE_FLASH_ATTR clock_get_day_time(day_time_t *day_time);
 //解析时间字符串
 void ICACHE_FLASH_ATTR clock_str_to_time(char *time_str, clock_time_t *time);
+//解析一周重复周期   "1111100" -> 周一到周五       "today" -> 今天  
+void ICACHE_FLASH_ATTR clock_str_to_week_bit(char *week_str, uint8_t *week_bit);
 
 //关闭定时任务
 int ICACHE_FLASH_ATTR clock_close_timer(int id);
@@ -86,6 +91,11 @@ int ICACHE_FLASH_ATTR clock_add_today_timer(clock_time_t time, int task_id);
 int ICACHE_FLASH_ATTR clock_add_everyday_timer(clock_time_t time, int task_id);
 //添加每天的定时
 int ICACHE_FLASH_ATTR clock_add_timer(clock_time_t time, uint8_t week_bit, int task_id);
+
+//获取定时任务的信息
+void ICACHE_FLASH_ATTR clock_get_timer_task_item_info_josn(int id, char *json_str);
+//获取全部定时任务的信息
+int ICACHE_FLASH_ATTR clock_get_timer_task_info(user_timer_t *timer_info);
 
 //获取用于oled显示的字符串  "13.11    Tue    02.04"
 void ICACHE_FLASH_ATTR clock_get_oled_time(char *oled_str);

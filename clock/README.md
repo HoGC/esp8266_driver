@@ -29,6 +29,7 @@ void ICACHE_FLASH_ATTR clock_test(void){
     int timer_id0;
     int timer_id1;
     int timer_id2;
+    int timer_id3;
     clock_time_t time0;
     clock_time_t time1;
     clock_time_t time2;
@@ -49,10 +50,20 @@ void ICACHE_FLASH_ATTR clock_test(void){
      * 返回值定时任务id
      */
     timer_id0 = clock_add_timer(time0, (WEEK_MON | WEEK_FRI), TASK1_ID);
+
+    /* 解析重复周期字符串
+     * "1111111"  7位  周一到周日
+     * "today"    今天
+     */    
+    uint8_t week_bit;
+    clock_str_to_week_bit("1111100", &week_bit);
+    //添加周一到周五的
+    timer_id1 = clock_add_timer(time0, week_bit, TASK2_ID);
+
     //添加当天的定时
-    timer_id1 = clock_add_today_timer(time1, TASK2_ID);
+    timer_id2 = clock_add_today_timer(time1, TASK2_ID);
     //添加每天的定时
-    timer_id2 = clock_add_everyday_timer(time2, TASK3_ID);
+    timer_id3 = clock_add_everyday_timer(time2, TASK3_ID);
 
     // //修改定时任务
     // clock_str_to_time("12:02:00", &time0);
@@ -68,10 +79,7 @@ void ICACHE_FLASH_ATTR clock_test(void){
     //删除定时任务
     clock_delete_timer(timer_id2);
 
-    //注意: 
-    //因有掉电保护功能 每次添加的都会被保存到flash中 
-    //同时每次添加都会检验  无法添加（时间 重复周期 任务id）相同的定时
-
+    //注意: 因有掉电保护功能 每次重启都会添加 但无法添加相同时间和相同任务id的定时 
 
     //------------------------------
     //联网校准时间 已自动校准 无需调用 校准周期请修改 TIME_UPDATE_COUNT
@@ -80,7 +88,39 @@ void ICACHE_FLASH_ATTR clock_test(void){
     day_time_t day_time;
     clock_get_day_time(&day_time);
 
+    //通过id获取定时任务信息
+    // {
+	//     "id"：1000,
+	//     "status": 1,
+	//     "time": "17:45:00",
+	//     "week": "1111110",
+	//     "taskId": 202
+    // }
+    char timer_itme_info[256];
+    clock_get_timer_task_item_info_josn(timer_id1, timer_itme_info);
 
+    // 获取全部定时任务信息
+    // {
+    //     "timerNum": 2,
+    //     "timerInfo": [
+    //         {
+    //             "id": 1000,
+    //             "status": 1,
+    //             "time": "17:45:00",
+    //             "week": "1111110",
+    //             "taskId": 202
+    //         },
+    //         {
+    //             "id": 1001,
+    //             "status": 1,
+    //             "time": "20:50:00",
+    //             "week": "today",
+    //             "taskId": 203
+    //         }
+    //     ]
+    // }
+    char timer_info[1024];
+    clock_get_timer_task_info_json(timer_info);
 
     //-----------------------------
     //获取用于oled显示的字符串  "13.11    Tue    02.04"

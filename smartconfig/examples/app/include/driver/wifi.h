@@ -27,5 +27,6 @@ typedef void (*wifdisconnect_cb_t)(void);
 void ICACHE_FLASH_ATTR wifi_connect(uint8_t* ssid, uint8_t* pass);
 void ICACHE_FLASH_ATTR set_wifistate_cb(wifconnect_cb_t connect_cb, wifdisconnect_cb_t disconnect_cb);
 void ICACHE_FLASH_ATTR start_smartconfig(smartconfig_cd_t cd);
+bool ICACHE_FLASH_ATTR get_wifi_connect_status(void);
 
 #endif /* USER_WIFI_H_ */

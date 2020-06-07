@@ -1,10 +1,12 @@
+#include "driver/clock.h"
+
 #include "osapi.h"
 #include "mem.h"
 #include "sntp.h"
 #include "stdlib.h"
-#include "driver/clock.h"
+#include "user_interface.h"
 
-#define CLOCK_DEBUG_ON
+// #define CLOCK_DEBUG_ON
 
 #if defined(CLOCK_DEBUG_ON)
 #define INFO( format, ... ) os_printf( format, ## __VA_ARGS__ )
@@ -12,7 +14,6 @@
 #define INFO( format, ... )
 #endif
 
-#define TIMER_STATIC_ID 			0
 
 static day_time_t day_time_data;
 static user_timer_t user_timer[USER_TIMER_MIX];
@@ -42,27 +43,34 @@ void ICACHE_FLASH_ATTR parse_time_count(clock_time_t *time) {
 }
 
 void ICACHE_FLASH_ATTR clock_flash_write_timer(void){
-	spi_flash_erase_sector(250);
-    spi_flash_write(250 * 4096, (uint32 *) &user_timer, sizeof(user_timer_t)*USER_TIMER_MIX);
+	spi_flash_erase_sector(120);
+    spi_flash_write(120 * 4096, (uint32 *) &user_timer, sizeof(user_timer_t)*USER_TIMER_MIX);
 }
 
 void ICACHE_FLASH_ATTR clock_flash_read_timer(void){
 	uint8_t i;
 	user_timer_t flash_timer[USER_TIMER_MIX];
 
-	spi_flash_read(250 * 4096, (uint32 *) &flash_timer, sizeof(user_timer_t) * USER_TIMER_MIX);
+	spi_flash_read(120 * 4096, (uint32 *) &flash_timer, sizeof(user_timer_t) * USER_TIMER_MIX);
 	for (i = 0; i < USER_TIMER_MIX; i++)
 	{
-		if((flash_timer[i].status <= 1) && (flash_timer[i].res <= 1)){
-			if((flash_timer[i].week_bit != 0x00) && (flash_timer[i].week_bit != 0xFF)){
+		if(flash_timer[i].id != (-1)){
+			if((flash_timer[i].status <= 1) && (flash_timer[i].res <= 1) && (flash_timer[i].week_bit != 0x00) && (flash_timer[i].week_bit != 0xFF)){
 				uint32_t time_count;
 				time_count = ((flash_timer[i].time.hour*60*60) + (flash_timer[i].time.minute*60) + flash_timer[i].time.seconds);
 				if(time_count == flash_timer[i].time.time_count){
-					user_timer[i] =  flash_timer[i];
+					user_timer[i] = flash_timer[i];
 					INFO("user_timer%d: %02d:%02d:%02d\n",i, flash_timer[i].time.hour, flash_timer[i].time.minute, flash_timer[i].time.seconds);
+				}else{
+					user_timer[i].id = (-1);
 				}
+			}else{
+				user_timer[i].id = (-1);
 			}
+		}else{
+			user_timer[i].id = (-1);
 		}
+		INFO("clock_flash_write_timer%d   id: %d", i, user_timer[i].id);
 	}
 }
 
@@ -144,6 +152,70 @@ uint8_t ICACHE_FLASH_ATTR clock_update(void){
 	}
 	return 0;
 }
+void ICACHE_FLASH_ATTR clock_str_to_week_bit(char *week_str, uint8_t *week_bit){
+	INFO("clock_str_to_week_bit: %s\n",week_str);
+	int i = 0;
+	uint8_t bit = 0;
+	uint8_t sun_bit = 0;
+	uint8_t week_bit_buf = 0;
+	uint32_t week_int;
+
+	if(os_strcmp("today",week_str) == 0){
+		*week_bit = WEEK_TODAT; 
+		return;
+	}
+	
+	week_int = atoi(week_str);
+	if(week_int > 0){
+		//sunday
+		if(week_int%10 == 1){
+			sun_bit = 0x01;
+		}
+		week_int = week_int/10;
+		for ( i = 0; i < 6; i++)
+		{
+			uint8_t bit = 0;
+			bit = week_int%10;
+			if(bit == 1){
+				week_bit_buf = week_bit_buf | (0x01 << i);
+			}
+			week_int = week_int/10;
+		}
+		*week_bit = week_bit_buf | sun_bit;
+	}else{
+		*week_bit = 0;
+	}
+}
+
+void ICACHE_FLASH_ATTR clock_week_bit_to_str(uint8_t week_bit, char *week_str){
+	INFO("clock_week_bit: %02x",week_bit);
+	int i = 0;
+	int bit = 0;
+	int sun_bit = 0;
+	uint32_t week_int;
+	char week_str_buf1[15] = "%d%s";
+	char week_str_buf2[15] = "";
+
+	if(week_bit & WEEK_TODAT){
+		os_strcpy(week_str, "today");
+		return;
+	}
+
+	for ( i = 5; i >= 0; i--)
+	{
+		if(week_bit & (1<<i)){
+			os_sprintf(week_str_buf2, week_str_buf1, 1, "%d%s");
+		}else{
+			os_sprintf(week_str_buf2, week_str_buf1, 0, "%d%s");
+		}
+		os_strcpy(week_str_buf1, week_str_buf2);
+	}
+	if(week_bit & (1<<6)){
+		os_sprintf(week_str, week_str_buf1, 1, "\0");
+	}else{
+		os_sprintf(week_str, week_str_buf1, 0, "\0");
+	}
+}
 
 //"12:00:00"
 void ICACHE_FLASH_ATTR clock_str_to_time(char *time_str, clock_time_t *time){
@@ -181,8 +253,13 @@ void ICACHE_FLASH_ATTR clock_str_to_time(char *time_str, clock_time_t *time){
 			time->seconds = 0;
 		}
 		INFO("time: %02d:%02d:%02d \n", time->hour, time->minute, time->seconds);
-
 	}
+}
+
+//"12:00:00"
+void ICACHE_FLASH_ATTR clock_time_to_str(clock_time_t time, char *time_str){
+
+	os_sprintf(time_str, "%02d:%02d:%02d", time.hour, time.minute, time.seconds);
 }
 
 int ICACHE_FLASH_ATTR clock_add_today_timer(clock_time_t time, int task_id){
@@ -195,13 +272,17 @@ int ICACHE_FLASH_ATTR clock_add_everyday_timer(clock_time_t time, int task_id){
 	return clock_add_timer(time, WEEK_EVERY, task_id);
 }
 
-int ICACHE_FLASH_ATTR clock_get_timer(int id, user_timer_t *user_timer){
+int ICACHE_FLASH_ATTR clock_get_timer(int id, user_timer_t *timer){
+	INFO("clock_get_timer_to_id: %d\n", id);
+
 	int timer_id;
 	timer_id = id - TIMER_STATIC_ID;
 	if((timer_id < USER_TIMER_MIX) || (user_timer[timer_id].id == id)){
-		user_timer = &user_timer[timer_id];
+		INFO("clock_get_timer_succeed\n");
+		os_memcpy(timer, &user_timer[timer_id], sizeof(user_timer_t));
 		return TIMER_SUCCEED;
 	}else{
+		INFO("clock_get_timer_nonentity\n");
 		return TIMER_NONENTITY;
 	}
 }
@@ -268,14 +349,20 @@ int ICACHE_FLASH_ATTR clock_set_timer(int id, clock_time_t time, uint8_t week_bi
 int ICACHE_FLASH_ATTR clock_add_timer(clock_time_t time, uint8_t week_bit, int task_id){
 
 	uint8_t i;
-	if(verify_time_info(&time)){
+	if(verify_time_info(&time) && (week_bit != 0)){
 		for(i = 0; i < USER_TIMER_MIX; i++){
-			if((user_timer[i].time.time_count == time.time_count) && (user_timer[i].week_bit == week_bit) && (user_timer[i].task_id == task_id)){
-				return TIMER_REPEAT;
+			if((user_timer[i].time.time_count == time.time_count) && (user_timer[i].task_id == task_id)){
+				if(user_timer[i].week_bit == week_bit){
+					INFO("TIMER_REPEAT");
+					return TIMER_REPEAT;
+				}
+				user_timer[i].week_bit = week_bit;
+				INFO("TIMER_MODIFY");
+				return TIMER_MODIFY;
 			}
 		}
 		for(i = 0; i < USER_TIMER_MIX; i++){
-			if(user_timer[i].week_bit == 0){
+			if(user_timer[i].id == (-1)){
 				INFO("add_timer%d: %02d:%02d:%02d\n",i, time.hour, time.minute, time.seconds);
 				user_timer[i].id = TIMER_STATIC_ID + i;
 				user_timer[i].status = 1;
@@ -288,8 +375,10 @@ int ICACHE_FLASH_ATTR clock_add_timer(clock_time_t time, uint8_t week_bit, int t
 				return TIMER_STATIC_ID + i;
 			}
 		}
+		INFO("TIMER_FULL");
 		return TIMER_FULL;
 	}else{
+		INFO("TIMER_INFO_ERROR");
 		return TIMER_INFO_ERROR;
 	}
 }
@@ -330,18 +419,22 @@ int ICACHE_FLASH_ATTR clock_delete_timer(int id){
 
 	int timer_id;
 	timer_id = id - TIMER_STATIC_ID;
-	if((timer_id < USER_TIMER_MIX) || (user_timer[timer_id].id == id)){
+	if((timer_id < USER_TIMER_MIX) && (user_timer[timer_id].id == id)){
+		INFO("delete_timer%d\n",timer_id);
+		user_timer[timer_id].id = -1;
 		user_timer[timer_id].status = 0;
 		user_timer[timer_id].res = 0;
 		user_timer[timer_id].week_bit = 0;
 		clock_flash_write_timer();
+		INFO("TIMER_SUCCEED\n");
 		return TIMER_SUCCEED;
 	}else{
+		INFO("TIMER_NONENTITY\n");
 		return TIMER_NONENTITY;
 	}
 }
 
-void clock_timer_cb(void){
+void ICACHE_FLASH_ATTR clock_timer_cb(void){
 	
 	static uint32_t update_count = 0;
 	static uint8_t update_flag = 1;
@@ -380,7 +473,7 @@ void clock_timer_cb(void){
 
 	for(i = 0; i < USER_TIMER_MIX; i++)
 	{
-		if(user_timer[i].week_bit != 0){
+		if(user_timer[i].id != (-1)){
 			if((user_timer[i].status) && (user_timer[i].res)){
 				INFO("user_timer%d: %02d:%02d:%02d\n",i,user_timer[i].time.hour,user_timer[i].time.minute,user_timer[i].time.seconds);
 				if((timestamp_time_count >= user_timer[i].time.time_count) && (timestamp_time_count <= (user_timer[i].time.time_count + 60))){
@@ -392,6 +485,9 @@ void clock_timer_cb(void){
 								user_timer[i].status = 0;
 							}
 							clock_handler(user_timer[i]);
+							if(user_timer[i].week_bit == WEEK_TODAT){
+								clock_delete_timer(user_timer[i].id);
+							}
 							clock_flash_write_timer();
 						}
 					}else{
@@ -418,7 +514,87 @@ void ICACHE_FLASH_ATTR clock_get_oled_time(char *oled_str){
 
 	parse_time_count(&time);
 	os_sprintf(oled_str,"%02d:%02d    %s    %02d.%02d",
-						time.hour, time.minute, week_str[day_time_data.week], day_time_data.month, day_time_data.day);
+		time.hour, time.minute, week_str[day_time_data.week], day_time_data.month, day_time_data.day);
+}
+
+int ICACHE_FLASH_ATTR clock_get_timer_task_num(void){
+	int i = 0;
+	int timer_num = 0;
+	for(i = 0; i < USER_TIMER_MIX; i++)
+	{
+		if(user_timer[i].id != (-1)){
+			timer_num++;
+		}
+	}
+	return timer_num;
+}
+
+int ICACHE_FLASH_ATTR clock_get_timer_task_info(user_timer_t *timer_info){
+	int i = 0;
+	int timer_num;
+	for(i = 0; i < USER_TIMER_MIX; i++)
+	{
+		if(user_timer[i].id != (-1)){
+			timer_info[timer_num] = user_timer[i];
+		}else{
+			timer_info[timer_num].id = (-1);
+		}
+	}
+	return timer_num;
+}
+
+void ICACHE_FLASH_ATTR clock_get_timer_task_item_info_josn(int id, char *json_str){
+
+	user_timer_t timer;
+	char week_str[10] = "";
+	char timer_itme_buf[200]= "{\n"			 	    	\
+						"\t\"id\": %d,\n" 	 		   	 	\
+						"\t\"status\": %d,\n" 	 			\
+						"\t\"time\": \"%02d:%02d:%02d\",\n" 	\
+						"\t\"week\": \"%s\",\n" 	 	 		\
+						"\t\"taskId\": %d\n" 	 			\
+						"}";
+
+	clock_get_timer(id, &timer);
+	clock_week_bit_to_str(timer.week_bit, week_str);
+	os_sprintf(json_str, timer_itme_buf, timer.id,timer.status, timer.time.hour, timer.time.minute, timer.time.seconds, week_str, timer.task_id);
+	// INFO("timer_itme: %s",json_str);
+}
+
+void ICACHE_FLASH_ATTR clock_get_timer_task_info_json(char *json_str){
+	int i = 0;
+	int num = 0;
+	int timer_num;
+	char str_buf1[1024] = "{\n"							\
+							"\t\"timerNum\": %d,\n"		\
+							"\t\"timerInfo\": [%s]\n"	\
+							"}\n";
+	char str_buf2[1024] = "";
+
+	timer_num = clock_get_timer_task_num();
+	INFO("timer_num: %d\n",timer_num);
+	if(timer_num > 0){
+		os_sprintf(str_buf2, str_buf1, timer_num, "%s%s");
+		os_strcpy(str_buf1, str_buf2);
+		for(i = 0; i < USER_TIMER_MIX; i++)
+		{
+			if(user_timer[i].id != (-1)){
+				num++;
+				char timer_itme[200];
+				clock_get_timer_task_item_info_josn(user_timer[i].id, timer_itme);
+				if(num < timer_num){
+					os_sprintf(str_buf2, str_buf1, timer_itme, ",\n%s%s");
+				}else{
+					os_sprintf(str_buf2, str_buf1, timer_itme, "\0");
+				}
+				os_strcpy(str_buf1, str_buf2);
+			}
+		}
+		strcpy(json_str, str_buf1);
+	}else{
+		os_sprintf(json_str, str_buf1, 0, "\0");
+	}
+	INFO("timer_info: \n%s",json_str);
 }
 
 void ICACHE_FLASH_ATTR clock_init(clock_handler_cd_t user_handler_cd){
@@ -427,6 +603,7 @@ void ICACHE_FLASH_ATTR clock_init(clock_handler_cd_t user_handler_cd){
 
 	clock_sntp_init();
 
+	os_memset(user_timer, 0, sizeof(user_timer_t)*USER_TIMER_MIX);
 	clock_flash_read_timer();
 
 	os_timer_disarm(&OS_Timer_Clock);
